@@ -20,7 +20,7 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 // DOM Elements
 const menuGrid = document.getElementById('menuGrid');
-const adminBtn = document.getElementById('adminBtn');
+const adminBtn = document.getElementById('adminBtn'); // Will be null since removed from HTML
 const adminPanel = document.getElementById('adminPanel');
 const closeAdminBtn = document.getElementById('closeAdminBtn');
 const logoutBtn = document.getElementById('logoutBtn');
@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadCart();
     renderMenuItems();
     checkAuthentication();
+    checkAdminURLParameters();
     setupEventListeners();
 });
 
@@ -310,16 +311,47 @@ function destroySession() {
     updateAdminButton();
 }
 
-function updateAdminButton() {
-    if (isAuthenticated) {
-        adminBtn.innerHTML = '<i class="fas fa-user-shield"></i> Admin (Logged In)';
-        adminBtn.style.background = 'rgba(40, 167, 69, 0.8)';
-        adminBtn.style.borderColor = '#28a745';
-    } else {
-        adminBtn.innerHTML = '<i class="fas fa-user-shield"></i> Admin';
-        adminBtn.style.background = 'rgba(255,255,255,0.2)';
-        adminBtn.style.borderColor = 'white';
+// Check admin URL parameters for direct access
+function checkAdminURLParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const adminAction = urlParams.get('admin');
+    
+    if (adminAction === 'login') {
+        // Check if coming from admin.html with valid session
+        const sessionLoggedIn = sessionStorage.getItem('adminLoggedIn');
+        const loginTime = parseInt(sessionStorage.getItem('adminLoginTime') || '0');
+        const currentTime = Date.now();
+        const sessionDuration = 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (sessionLoggedIn === 'true' && (currentTime - loginTime < sessionDuration)) {
+            // Valid session, auto-login
+            createSession();
+            openAdminPanel();
+            showToast('Admin access granted via admin portal', 'success');
+            
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            // Session expired or invalid, show login modal
+            openLoginModal();
+            showToast('Please login to access admin panel', 'info');
+        }
+    } else if (adminAction === 'panel') {
+        // Direct admin panel access
+        if (isAuthenticated) {
+            openAdminPanel();
+        } else {
+            openLoginModal();
+        }
+        
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
+}
+
+function updateAdminButton() {
+    // Admin button is removed from UI, so this function is now a no-op
+    // Admin access is only available via keyboard shortcut (Ctrl+A)
 }
 
 function validateCredentials(username, password) {
@@ -471,7 +503,9 @@ function setupEventListeners() {
     }
     
     // Admin panel controls
-    adminBtn.addEventListener('click', handleAdminButtonClick);
+    if (adminBtn) {
+        adminBtn.addEventListener('click', handleAdminButtonClick);
+    }
     closeAdminBtn.addEventListener('click', closeAdminPanel);
     logoutBtn.addEventListener('click', handleLogout);
     
@@ -996,16 +1030,17 @@ function importData(event) {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
-    // Ctrl/Cmd + A to open admin panel
+    // Ctrl/Cmd + A to open admin login
     if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
-        openAdminPanel();
+        openLoginModal();
     }
     
     // Escape to close modals
     if (e.key === 'Escape') {
         closeAdminPanel();
         closeEditModal();
+        closeLoginModal();
     }
 });
 
