@@ -11,8 +11,8 @@ const CART_KEY = 'pindiVantaluCart';
 // Authentication
 let isAuthenticated = false;
 let adminCredentials = {
-    username: 'admin',
-    password: 'admin123'
+    username: 'sridevi',
+    password: 'vantalu2024'
 };
 const CREDENTIALS_KEY = 'pindiVantaluAdminCredentials';
 const SESSION_KEY = 'pindiVantaluAdminSession';
@@ -163,6 +163,8 @@ function saveMenuItems() {
 
 // Load admin credentials from localStorage
 function loadCredentials() {
+    // Clear any existing stored credentials to use the new defaults
+    localStorage.removeItem(CREDENTIALS_KEY);
     const storedCredentials = localStorage.getItem(CREDENTIALS_KEY);
     if (storedCredentials) {
         adminCredentials = JSON.parse(storedCredentials);
