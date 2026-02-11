@@ -57,6 +57,436 @@ const newUsernameInput = document.getElementById('newUsername');
 const newPasswordInput = document.getElementById('newPassword');
 const confirmPasswordInput = document.getElementById('confirmPassword');
 
+// Admin access is now restricted - use direct URL for admin dashboard
+// Main website no longer has admin shortcuts for security
+
+// Direct checkout function - bypasses event listeners
+function handleCheckoutDirect() {
+    console.log('Direct checkout function called');
+    
+    if (cart.length === 0) {
+        alert('Your cart is empty');
+        return;
+    }
+    
+    // Show customer details form instead of direct checkout
+    showCustomerDetailsForm();
+}
+
+// Show customer details form - Make globally accessible
+window.showCustomerDetailsForm = function() {
+    console.log('showCustomerDetailsForm called');
+    
+    if (cart.length === 0) {
+        alert('Your cart is empty');
+        return;
+    }
+    
+    const cartFooter = document.querySelector('.cart-footer');
+    const customerForm = document.getElementById('customerDetailsForm');
+    
+    console.log('Elements found:', { cartFooter: !!cartFooter, customerForm: !!customerForm });
+    
+    if (cartFooter && customerForm) {
+        cartFooter.classList.add('hidden');
+        customerForm.classList.remove('hidden');
+        
+        // Focus on first input field
+        setTimeout(() => {
+            const nameInput = document.getElementById('customerName');
+            if (nameInput) {
+                nameInput.focus();
+                console.log('Focused on name input');
+            }
+        }, 300);
+        
+        console.log('Customer details form shown');
+    } else {
+        console.error('Cart footer or customer form not found');
+        alert('Error: Could not open customer details form');
+    }
+};
+
+// Hide customer details form and show cart footer - Make globally accessible
+window.hideCustomerDetailsForm = function() {
+    console.log('hideCustomerDetailsForm called');
+    
+    const cartFooter = document.querySelector('.cart-footer');
+    const customerForm = document.getElementById('customerDetailsForm');
+    
+    console.log('Elements found:', { cartFooter: !!cartFooter, customerForm: !!customerForm });
+    
+    if (cartFooter && customerForm) {
+        cartFooter.classList.remove('hidden');
+        customerForm.classList.add('hidden');
+        console.log('Customer details form hidden');
+    } else {
+        console.error('Cart footer or customer form not found');
+    }
+};
+
+// Cancel customer form function - Make globally accessible
+window.cancelCustomerForm = function() {
+    console.log('cancelCustomerForm called');
+    
+    if (confirm('Are you sure you want to cancel this order?')) {
+        hideCustomerDetailsForm();
+        const customerFormElement = document.getElementById('customerForm');
+        if (customerFormElement) {
+            customerFormElement.reset();
+            console.log('Customer form reset');
+        }
+    }
+};
+
+// Submit customer form function - Make globally accessible
+window.submitCustomerForm = function() {
+    console.log('submitCustomerForm called');
+    
+    // Get customer details
+    const customerName = document.getElementById('customerName').value.trim();
+    const customerPhone = document.getElementById('customerPhone').value.trim();
+    const customerAddress = document.getElementById('customerAddress').value.trim();
+    const customerInstructions = document.getElementById('customerInstructions').value.trim();
+    
+    console.log('Customer details:', { customerName, customerPhone, customerAddress, customerInstructions });
+    
+    // Validate required fields
+    if (!customerName || !customerPhone || !customerAddress) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    // Validate phone number (10 digits)
+    if (!/^[0-9]{10}$/.test(customerPhone)) {
+        alert('Please enter a valid 10-digit phone number');
+        return;
+    }
+    
+    // Proceed with WhatsApp checkout with customer details
+    proceedWithWhatsAppCheckout(customerName, customerPhone, customerAddress, customerInstructions);
+};
+
+// Handle customer form submission
+function handleCustomerForm(e) {
+    e.preventDefault();
+    submitCustomerForm();
+}
+
+// Proceed with WhatsApp checkout including customer details - Make globally accessible
+window.proceedWithWhatsAppCheckout = function(customerName, customerPhone, customerAddress, customerInstructions) {
+    const total = getCartTotal();
+    const itemCount = getCartItemCount();
+    
+    // Build order details for WhatsApp message
+    let orderMessage = "🍽️ *SRIDEVI PINDI VANTALU Order* 🍽️\n\n";
+    
+    // Add customer details
+    orderMessage += "*👤 Customer Details:*\n";
+    orderMessage += `📞 Name: ${customerName}\n`;
+    orderMessage += `📱 Phone: ${customerPhone}\n`;
+    orderMessage += `🏠 Address: ${customerAddress}\n`;
+    if (customerInstructions) {
+        orderMessage += `📝 Instructions: ${customerInstructions}\n`;
+    }
+    orderMessage += "\n";
+    
+    // Add order details
+    orderMessage += "*📋 Order Details:*\n";
+    
+    cart.forEach((item, index) => {
+        orderMessage += `${index + 1}. ${item.name} - ${item.quantity} x ₹${item.price.toFixed(2)} = ₹${(item.price * item.quantity).toFixed(2)}\n`;
+    });
+    
+    orderMessage += `\n*Total Items:* ${itemCount}`;
+    orderMessage += `\n*Total Amount:* ₹${total.toFixed(2)}`;
+    orderMessage += "\n\n*📞 Please confirm this order and provide delivery details.*";
+    
+    // Generate order ID
+    const orderId = 'ORD' + Date.now() + Math.random().toString(36).substr(2, 5).toUpperCase();
+    
+    // Add order ID to WhatsApp message
+    orderMessage = `📋 *Order ID: ${orderId}*\n\n` + orderMessage;
+    
+    console.log('Order message with customer details:', orderMessage);
+    
+    // Track order in Firebase database (with error handling)
+    let finalOrderId = orderId;
+    
+    try {
+        if (typeof LiveMonitoring !== 'undefined' && LiveMonitoring.trackOrder) {
+            const orderData = {
+                items: cart.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    subtotal: item.price * item.quantity
+                })),
+                total: total,
+                itemCount: itemCount,
+                status: 'pending',
+                customerDetails: {
+                    name: customerName,
+                    phone: customerPhone,
+                    address: customerAddress,
+                    instructions: customerInstructions
+                }
+            };
+            finalOrderId = LiveMonitoring.trackOrder(orderData);
+        }
+    } catch (error) {
+        console.log('Database tracking failed, using local order ID:', error);
+    }
+    
+    // Encode message for WhatsApp URL
+    const encodedMessage = encodeURIComponent(orderMessage);
+    const whatsappNumber = "9866406807";
+    const whatsappURL = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+    
+    console.log('WhatsApp URL:', whatsappURL);
+    
+    // Open WhatsApp in new tab with multiple fallbacks
+    try {
+        // Method 1: Direct window.open
+        const newWindow = window.open(whatsappURL, '_blank');
+        
+        if (newWindow) {
+            console.log('WhatsApp opened successfully');
+            // Clear cart and reset form after successful checkout
+            cart = [];
+            saveCart();
+            closeCart();
+            hideCustomerDetailsForm();
+            document.getElementById('customerForm').reset();
+            alert(`Order #${finalOrderId} placed! WhatsApp opened in new tab.`);
+        } else {
+            // Method 2: Popup blocked, try location change
+            console.log('Popup blocked, trying location change');
+            window.location.href = whatsappURL;
+        }
+    } catch (error) {
+        console.error('Failed to open WhatsApp:', error);
+        
+        // Method 3: Copy to clipboard
+        try {
+            navigator.clipboard.writeText(orderMessage).then(() => {
+                alert(`Order #${finalOrderId} prepared! Message copied to clipboard. Please open WhatsApp manually and paste.`);
+            }).catch(() => {
+                // Method 4: Show message in alert
+                alert(`Order #${finalOrderId} prepared! Please open WhatsApp and send this message:\n\n${orderMessage}`);
+            });
+        } catch (clipboardError) {
+            alert(`Order #${finalOrderId} prepared! Please open WhatsApp and send this message:\n\n${orderMessage}`);
+        }
+    }
+}
+
+// Original handleCheckout function (kept for compatibility)
+function handleCheckout() {
+    console.log('handleCheckout called - this should not be used anymore');
+    // This function is deprecated, use showCustomerDetailsForm() instead
+}
+
+// Function to show admin panel
+function showAdminPanel() {
+    // Create admin panel if it doesn't exist
+    if (!document.getElementById('adminPanel')) {
+        createAdminPanel();
+    }
+    
+    const adminPanel = document.getElementById('adminPanel');
+    if (adminPanel) {
+        adminPanel.classList.remove('hidden');
+        
+        // Check if already authenticated
+        if (isAuthenticated) {
+            // Show admin content directly
+            loadAdminItems();
+        } else {
+            // Show login modal
+            showLoginModal();
+        }
+    }
+}
+
+// Function to create admin panel dynamically
+function createAdminPanel() {
+    const adminHTML = `
+        <div id="adminPanel" class="admin-panel hidden">
+            <div class="admin-container">
+                <div class="admin-header">
+                    <h2>Admin Panel</h2>
+                    <div class="admin-header-actions">
+                        <button id="logoutBtn" class="btn btn-secondary">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                        <button id="closeAdminBtn" class="close-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="admin-content">
+                    <!-- Add Item Form -->
+                    <div class="admin-section">
+                        <h3>Add New Item</h3>
+                        <form id="addItemForm" class="item-form">
+                            <div class="form-group">
+                                <label for="itemName">Item Name</label>
+                                <input type="text" id="itemName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="itemPrice">Price (₹)</label>
+                                <input type="number" id="itemPrice" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="itemDescription">Description</label>
+                                <textarea id="itemDescription" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="itemCategory">Category</label>
+                                <select id="itemCategory">
+                                    <option value="pickles">Pickles</option>
+                                    <option value="sweets">Sweets</option>
+                                    <option value="pindi-vantalu">Pindi Vantalu</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Add Item</button>
+                        </form>
+                    </div>
+
+                    <!-- Edit/Delete Items -->
+                    <div class="admin-section">
+                        <h3>Manage Items</h3>
+                        <div class="items-list" id="adminItemsList">
+                            <!-- Items will be dynamically added here -->
+                        </div>
+                    </div>
+
+                    <!-- Update Credentials -->
+                    <div class="admin-section">
+                        <h3>Update Admin Credentials</h3>
+                        <form id="updateCredentialsForm" class="credentials-form">
+                            <div class="form-group">
+                                <label for="currentPassword">Current Password</label>
+                                <input type="password" id="currentPassword" required placeholder="Enter current password">
+                            </div>
+                            <div class="form-group">
+                                <label for="newUsername">New Username</label>
+                                <input type="text" id="newUsername" placeholder="Enter new username (optional)">
+                            </div>
+                            <div class="form-group">
+                                <label for="newPassword">New Password</label>
+                                <input type="password" id="newPassword" placeholder="Enter new password (optional)">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmPassword">Confirm New Password</label>
+                                <input type="password" id="confirmPassword" placeholder="Confirm new password">
+                            </div>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-key"></i> Update Credentials
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Modal -->
+        <div id="loginModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Admin Login</h3>
+                    <button class="close-modal" id="closeLoginModalBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="loginForm" class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" required placeholder="Enter username">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" required placeholder="Enter password">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Login</button>
+                        <button type="button" class="btn btn-secondary" id="cancelLoginBtn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    // Insert admin panel before cart sidebar
+    const cartSidebar = document.getElementById('cartSidebar');
+    if (cartSidebar) {
+        cartSidebar.insertAdjacentHTML('beforebegin', adminHTML);
+    } else {
+        document.body.insertAdjacentHTML('beforeend', adminHTML);
+    }
+    
+    // Re-initialize admin event listeners
+    initializeAdminEventListeners();
+}
+
+// Initialize admin event listeners
+function initializeAdminEventListeners() {
+    // Admin panel buttons
+    const closeAdminBtn = document.getElementById('closeAdminBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (closeAdminBtn) closeAdminBtn.addEventListener('click', closeAdminPanel);
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+    
+    // Login modal buttons
+    const closeLoginModalBtn = document.getElementById('closeLoginModalBtn');
+    const cancelLoginBtn = document.getElementById('cancelLoginBtn');
+    
+    if (closeLoginModalBtn) closeLoginModalBtn.addEventListener('click', hideLoginModal);
+    if (cancelLoginBtn) cancelLoginBtn.addEventListener('click', hideLoginModal);
+    
+    // Forms
+    const loginForm = document.getElementById('loginForm');
+    const addItemForm = document.getElementById('addItemForm');
+    const updateCredentialsForm = document.getElementById('updateCredentialsForm');
+    
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    if (addItemForm) addItemForm.addEventListener('submit', handleAddItem);
+    if (updateCredentialsForm) updateCredentialsForm.addEventListener('submit', handleUpdateCredentials);
+    
+    // Load admin items if authenticated
+    if (isAuthenticated) {
+        loadAdminItems();
+    }
+}
+
+// Show login modal
+function showLoginModal() {
+    const loginModal = document.getElementById('loginModal');
+    if (loginModal) {
+        loginModal.classList.remove('hidden');
+    }
+}
+
+// Hide login modal
+function hideLoginModal() {
+    const loginModal = document.getElementById('loginModal');
+    if (loginModal) {
+        loginModal.classList.add('hidden');
+    }
+}
+
+// Close admin panel
+function closeAdminPanel() {
+    const adminPanel = document.getElementById('adminPanel');
+    if (adminPanel) {
+        adminPanel.classList.add('hidden');
+    }
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     loadMenuItems();
@@ -193,7 +623,6 @@ function addToCart(itemId) {
     if (!item) return;
     
     const existingItem = cart.find(cartItem => cartItem.id === itemId);
-    
     if (existingItem) {
         existingItem.quantity += 1;
     } else {
@@ -204,6 +633,13 @@ function addToCart(itemId) {
             quantity: 1
         });
     }
+    
+    // Track cart activity
+    LiveMonitoring.trackCartActivity('add', {
+        id: item.id,
+        name: item.name,
+        price: item.price
+    });
     
     saveCart();
     showToast(`${item.name} added to cart!`, 'success');
@@ -309,14 +745,15 @@ function destroySession() {
 }
 
 function updateAdminButton() {
+    const adminBtn = document.getElementById('adminBtn');
+    if (!adminBtn) return; // Exit if admin button doesn't exist
+    
     if (isAuthenticated) {
-        adminBtn.innerHTML = '<i class="fas fa-user-shield"></i> Admin (Logged In)';
-        adminBtn.style.background = 'rgba(40, 167, 69, 0.8)';
-        adminBtn.style.borderColor = '#28a745';
+        adminBtn.innerHTML = '<i class="fas fa-user-shield"></i> Admin Panel';
+        adminBtn.style.display = 'inline-block';
     } else {
-        adminBtn.innerHTML = '<i class="fas fa-user-shield"></i> Admin';
-        adminBtn.style.background = 'rgba(255,255,255,0.2)';
-        adminBtn.style.borderColor = 'white';
+        adminBtn.innerHTML = '<i class="fas fa-user-shield"></i> Admin Login';
+        adminBtn.style.display = 'inline-block';
     }
 }
 
@@ -348,8 +785,13 @@ function handleLogin(e) {
     
     if (validateCredentials(username, password)) {
         createSession();
-        closeLoginModal();
-        openAdminPanel();
+        hideLoginModal();
+        // Show admin content after successful login
+        const adminPanel = document.getElementById('adminPanel');
+        if (adminPanel) {
+            adminPanel.classList.remove('hidden');
+        }
+        loadAdminItems();
         showToast('Login successful! Welcome to admin panel.', 'success');
     } else {
         showToast('Invalid username or password', 'error');
@@ -465,48 +907,102 @@ function setupEventListeners() {
     }
     
     if (checkoutBtn) {
-        checkoutBtn.addEventListener('click', handleCheckout);
+        // Remove the old event listener that was interfering
+        checkoutBtn.removeEventListener('click', handleCheckout);
+        console.log('Old checkout event listener removed');
+    } else {
+        console.error('Checkout button not found');
     }
     
-    // Admin panel controls
-    adminBtn.addEventListener('click', handleAdminButtonClick);
-    closeAdminBtn.addEventListener('click', closeAdminPanel);
-    logoutBtn.addEventListener('click', handleLogout);
+    // Customer form event listeners
+    const backToCartBtn = document.getElementById('backToCartBtn');
+    const cancelOrderBtn = document.getElementById('cancelOrderBtn');
+    const customerForm = document.getElementById('customerForm');
     
-    // Login modal controls
-    closeLoginModalBtn.addEventListener('click', closeLoginModal);
-    cancelLoginBtn.addEventListener('click', closeLoginModal);
-    loginForm.addEventListener('submit', handleLogin);
+    if (backToCartBtn) {
+        backToCartBtn.addEventListener('click', hideCustomerDetailsForm);
+    }
     
-    // Credentials form
-    updateCredentialsForm.addEventListener('submit', handleUpdateCredentials);
+    if (cancelOrderBtn) {
+        cancelOrderBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to cancel this order?')) {
+                hideCustomerDetailsForm();
+                document.getElementById('customerForm').reset();
+            }
+        });
+    }
     
-    // Forms
-    addItemForm.addEventListener('submit', handleAddItem);
-    editItemForm.addEventListener('submit', handleEditItem);
+    if (customerForm) {
+        customerForm.addEventListener('submit', handleCustomerForm);
+    }
     
-    // Modal controls
-    closeModalBtn.addEventListener('click', closeEditModal);
-    cancelEditBtn.addEventListener('click', closeEditModal);
+    // Admin panel controls - only if they exist
+    if (typeof adminBtn !== 'undefined' && adminBtn) {
+        adminBtn.addEventListener('click', handleAdminButtonClick);
+    }
+    if (typeof closeAdminBtn !== 'undefined' && closeAdminBtn) {
+        closeAdminBtn.addEventListener('click', closeAdminPanel);
+    }
+    if (typeof logoutBtn !== 'undefined' && logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+    }
     
-    // Close modals on outside click
-    adminPanel.addEventListener('click', function(e) {
-        if (e.target === adminPanel) {
-            closeAdminPanel();
-        }
-    });
+    // Login modal controls - only if they exist
+    if (typeof closeLoginModalBtn !== 'undefined' && closeLoginModalBtn) {
+        closeLoginModalBtn.addEventListener('click', closeLoginModal);
+    }
+    if (typeof cancelLoginBtn !== 'undefined' && cancelLoginBtn) {
+        cancelLoginBtn.addEventListener('click', closeLoginModal);
+    }
+    if (typeof loginForm !== 'undefined' && loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
     
-    editModal.addEventListener('click', function(e) {
-        if (e.target === editModal) {
-            closeEditModal();
-        }
-    });
+    // Credentials form - only if it exists
+    if (typeof updateCredentialsForm !== 'undefined' && updateCredentialsForm) {
+        updateCredentialsForm.addEventListener('submit', handleUpdateCredentials);
+    }
     
-    loginModal.addEventListener('click', function(e) {
-        if (e.target === loginModal) {
-            closeLoginModal();
-        }
-    });
+    // Forms - only if they exist
+    if (typeof addItemForm !== 'undefined' && addItemForm) {
+        addItemForm.addEventListener('submit', handleAddItem);
+    }
+    if (typeof editItemForm !== 'undefined' && editItemForm) {
+        editItemForm.addEventListener('submit', handleEditItem);
+    }
+    
+    // Modal controls - only if they exist
+    if (typeof closeModalBtn !== 'undefined' && closeModalBtn) {
+        closeModalBtn.addEventListener('click', closeEditModal);
+    }
+    if (typeof cancelEditBtn !== 'undefined' && cancelEditBtn) {
+        cancelEditBtn.addEventListener('click', closeEditModal);
+    }
+    
+    // Close modals on outside click - only if elements exist
+    if (typeof adminPanel !== 'undefined' && adminPanel) {
+        adminPanel.addEventListener('click', function(e) {
+            if (e.target === adminPanel) {
+                closeAdminPanel();
+            }
+        });
+    }
+    
+    if (typeof editModal !== 'undefined' && editModal) {
+        editModal.addEventListener('click', function(e) {
+            if (e.target === editModal) {
+                closeEditModal();
+            }
+        });
+    }
+    
+    if (typeof loginModal !== 'undefined' && loginModal) {
+        loginModal.addEventListener('click', function(e) {
+            if (e.target === loginModal) {
+                closeLoginModal();
+            }
+        });
+    }
     
     // Close cart on outside click
     document.addEventListener('click', function(e) {
@@ -592,6 +1088,78 @@ function getCategoryIcon(category) {
     return icons[category] || 'fas fa-utensils';
 }
 
+// Save menu items to localStorage
+function saveMenuItems() {
+    localStorage.setItem('pindiVantaluMenuItems', JSON.stringify(menuItems));
+}
+
+// Load menu items from localStorage
+function loadMenuItems() {
+    const savedItems = localStorage.getItem('pindiVantaluMenuItems');
+    if (savedItems) {
+        try {
+            menuItems = JSON.parse(savedItems);
+            // Update nextId to avoid conflicts
+            if (menuItems.length > 0) {
+                nextId = Math.max(...menuItems.map(item => item.id)) + 1;
+            }
+        } catch (error) {
+            console.error('Error loading menu items:', error);
+            menuItems = getDefaultMenuItems();
+        }
+    } else {
+        menuItems = getDefaultMenuItems();
+    }
+}
+
+// Get default menu items if none exist
+function getDefaultMenuItems() {
+    return [
+        {
+            id: 1,
+            name: "Mango Pickle",
+            price: 150,
+            description: "Traditional homemade mango pickle with authentic spices",
+            category: "pickles"
+        },
+        {
+            id: 2,
+            name: "Lemon Pickle",
+            price: 120,
+            description: "Tangy lemon pickle with mustard seeds",
+            category: "pickles"
+        },
+        {
+            id: 3,
+            name: "Gulab Jamun",
+            price: 80,
+            description: "Soft and sweet milk dumplings in sugar syrup",
+            category: "sweets"
+        },
+        {
+            id: 4,
+            name: "Jalebi",
+            price: 60,
+            description: "Crispy sweet spirals soaked in sugar syrup",
+            category: "sweets"
+        },
+        {
+            id: 5,
+            name: "Murukulu",
+            price: 100,
+            description: "Crispy rice flour spirals with sesame seeds",
+            category: "pindi-vantalu"
+        },
+        {
+            id: 6,
+            name: "Chekkalu",
+            price: 90,
+            description: "Savory rice crackers with spices",
+            category: "pindi-vantalu"
+        }
+    ];
+}
+
 // Render cart items
 function renderCartItems() {
     cartItems.innerHTML = '';
@@ -657,8 +1225,18 @@ function handleCheckout() {
     let orderMessage = "🍽️ *SRIDEVI PINDI VANTALU Order* 🍽️\n\n";
     orderMessage += "*Order Details:*\n";
     
+    const orderItems = [];
+    
     cart.forEach((item, index) => {
         orderMessage += `${index + 1}. ${item.name} - ${item.quantity} x ₹${item.price.toFixed(2)} = ₹${(item.price * item.quantity).toFixed(2)}\n`;
+        
+        orderItems.push({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            subtotal: item.price * item.quantity
+        });
     });
     
     orderMessage += `\n*Total Items:* ${itemCount}`;
@@ -670,19 +1248,44 @@ function handleCheckout() {
     orderMessage += "📝 Special Instructions (if any):\n\n";
     orderMessage += "Please confirm your order by providing the above details.";
     
+    // Track order in Firebase database (with error handling)
+    let orderId = 'ORD' + Date.now() + Math.random().toString(36).substr(2, 5).toUpperCase();
+    
+    try {
+        if (typeof LiveMonitoring !== 'undefined' && LiveMonitoring.trackOrder) {
+            orderId = LiveMonitoring.trackOrder(orderData);
+        }
+    } catch (error) {
+        console.log('Database tracking failed, using local order ID:', error);
+    }
+    
+    // Add order ID to WhatsApp message
+    orderMessage = `📋 *Order ID: ${orderId}*\n\n` + orderMessage;
+    
     // Encode message for WhatsApp URL
     const encodedMessage = encodeURIComponent(orderMessage);
     const whatsappNumber = "9866406807";
     const whatsappURL = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
     
-    // Open WhatsApp in new tab
-    window.open(whatsappURL, '_blank');
+    // Open WhatsApp in new tab with error handling
+    try {
+        window.open(whatsappURL, '_blank');
+        console.log('WhatsApp URL opened:', whatsappURL);
+    } catch (error) {
+        console.error('Failed to open WhatsApp:', error);
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(orderMessage).then(() => {
+            alert('Order details copied to clipboard! Please open WhatsApp manually and paste the message.');
+        }).catch(() => {
+            alert('Please manually open WhatsApp and send this message:\n\n' + orderMessage);
+        });
+    }
     
     // Clear cart after successful checkout
     cart = [];
     saveCart();
     closeCart();
-    showToast('Redirecting to WhatsApp to place your order...', 'success');
+    showToast(`Order #${orderId} placed! Opening WhatsApp...`, 'success');
 }
 
 // Render admin items list
@@ -992,18 +1595,13 @@ function importData(event) {
     event.target.value = ''; // Reset file input
 }
 
-// Keyboard shortcuts
+// Keyboard shortcuts - admin access removed for security
 document.addEventListener('keydown', function(e) {
-    // Ctrl/Cmd + A to open admin panel
-    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-        e.preventDefault();
-        openAdminPanel();
-    }
-    
     // Escape to close modals
     if (e.key === 'Escape') {
         closeAdminPanel();
         closeEditModal();
+        hideLoginModal();
     }
 });
 
@@ -1024,5 +1622,35 @@ function initializeInteractiveElements() {
 
 // Call initialization functions
 document.addEventListener('DOMContentLoaded', function() {
+    // Load menu items first
+    loadMenuItems();
+    
+    // Initialize UI
+    renderMenuItems();
+    
+    // Initialize other elements
     initializeInteractiveElements();
+    
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Listen for storage changes from other tabs
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'pindiVantaluMenuItems') {
+            // Reload menu items when changed in another tab
+            loadMenuItems();
+            renderMenuItems();
+            console.log('Menu items synced from another tab');
+        }
+    });
+    
+    // Periodic sync check (every 5 seconds)
+    setInterval(function() {
+        const currentItems = localStorage.getItem('pindiVantaluMenuItems');
+        if (currentItems !== JSON.stringify(menuItems)) {
+            loadMenuItems();
+            renderMenuItems();
+            console.log('Menu items auto-synced');
+        }
+    }, 5000);
 });

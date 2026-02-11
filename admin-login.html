@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - SRIDEVI PINDI VANTALU</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .admin-login-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .login-header {
+            margin-bottom: 30px;
+        }
+        
+        .login-header h1 {
+            color: #ff6b35;
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+        
+        .login-header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .login-form {
+            text-align: left;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #ff6b35;
+        }
+        
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #856404;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #ff6b35;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fas fa-user-shield" style="font-size: 3rem; color: #ff6b35; margin-bottom: 15px;"></i>
+                <h1>Admin Login</h1>
+                <p>SRIDEVI PINDI VANTALU Management Portal</p>
+            </div>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" required placeholder="Enter admin username">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required placeholder="Enter admin password">
+                </div>
+                
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Login to Admin Panel
+                </button>
+            </form>
+            
+            <div class="security-notice">
+                <i class="fas fa-lock"></i>
+                <strong>Security Notice:</strong> This is a restricted area. Unauthorized access is prohibited and will be logged.
+            </div>
+            
+            <a href="index.html" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Website
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Admin credentials
+        let adminCredentials = {
+            username: 'admin',
+            password: 'admin123'
+        };
+
+        // Load saved credentials
+        function loadCredentials() {
+            const saved = localStorage.getItem('pindiVantaluAdminCredentials');
+            if (saved) {
+                adminCredentials = JSON.parse(saved);
+            }
+        }
+
+        // Validate credentials
+        function validateCredentials(username, password) {
+            return username === adminCredentials.username && password === adminCredentials.password;
+        }
+
+        // Handle login
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                alert('Please enter both username and password');
+                return;
+            }
+            
+            loadCredentials();
+            
+            if (validateCredentials(username, password)) {
+                // Create session
+                sessionStorage.setItem('pindiVantaluAdminSession', 'true');
+                sessionStorage.setItem('pindiVantaluAdminLoginTime', Date.now().toString());
+                
+                // Redirect to admin panel
+                window.location.href = 'admin-panel.html';
+            } else {
+                alert('Invalid username or password');
+                document.getElementById('password').value = '';
+                document.getElementById('password').focus();
+            }
+        });
+
+        // Check if already logged in
+        window.addEventListener('load', function() {
+            const session = sessionStorage.getItem('pindiVantaluAdminSession');
+            const loginTime = sessionStorage.getItem('pindiVantaluAdminLoginTime');
+            
+            if (session === 'true' && loginTime) {
+                const hoursSinceLogin = (Date.now() - parseInt(loginTime)) / (1000 * 60 * 60);
+                
+                if (hoursSinceLogin < 24) {
+                    // Session still valid, redirect to admin panel
+                    window.location.href = 'admin-panel.html';
+                } else {
+                    // Session expired, clear it
+                    sessionStorage.removeItem('pindiVantaluAdminSession');
+                    sessionStorage.removeItem('pindiVantaluAdminLoginTime');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
