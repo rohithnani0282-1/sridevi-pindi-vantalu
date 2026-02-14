@@ -1622,6 +1622,8 @@ function initializeInteractiveElements() {
 
 // Call initialization functions
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded - Starting initialization');
+    
     // Load menu items first
     loadMenuItems();
     
@@ -1634,23 +1636,74 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup event listeners
     setupEventListeners();
     
-    // Listen for storage changes from other tabs
-    window.addEventListener('storage', function(e) {
-        if (e.key === 'pindiVantaluMenuItems') {
-            // Reload menu items when changed in another tab
-            loadMenuItems();
-            renderMenuItems();
-            console.log('Menu items synced from another tab');
-        }
-    });
+    // Initialize mobile menu functionality
+    initializeMobileMenu();
     
-    // Periodic sync check (every 5 seconds)
-    setInterval(function() {
-        const currentItems = localStorage.getItem('pindiVantaluMenuItems');
-        if (currentItems !== JSON.stringify(menuItems)) {
-            loadMenuItems();
-            renderMenuItems();
-            console.log('Menu items auto-synced');
-        }
-    }, 5000);
+    console.log('Initialization complete');
 });
+
+// Mobile menu functionality
+function initializeMobileMenu() {
+    const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
+    const navLinks = document.querySelector('.nav-links');
+    
+    if (mobileMenuBtn && navLinks) {
+        console.log('Mobile menu elements found');
+        
+        mobileMenuBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Mobile menu button clicked');
+            
+            // Toggle active classes
+            navLinks.classList.toggle('active');
+            mobileMenuBtn.classList.toggle('active');
+            
+            console.log('Menu active state:', navLinks.classList.contains('active'));
+        });
+        
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(e) {
+            if (navLinks && !navLinks.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+                navLinks.classList.remove('active');
+                mobileMenuBtn.classList.remove('active');
+                console.log('Mobile menu closed (outside click)');
+            }
+        });
+        
+        // Close mobile menu when clicking on a nav link
+        const navLinksItems = document.querySelectorAll('.nav-link');
+        navLinksItems.forEach(link => {
+            link.addEventListener('click', function() {
+                navLinks.classList.remove('active');
+                mobileMenuBtn.classList.remove('active');
+                console.log('Mobile menu closed (link click)');
+            });
+        });
+    } else {
+        console.error('Mobile menu elements not found:', {
+            mobileMenuBtn: !!mobileMenuBtn,
+            navLinks: !!navLinks
+        });
+    }
+}
+
+// Listen for storage changes from other tabs
+window.addEventListener('storage', function(e) {
+    if (e.key === 'pindiVantaluMenuItems') {
+        // Reload menu items when changed in another tab
+        loadMenuItems();
+        renderMenuItems();
+        console.log('Menu items synced from another tab');
+    }
+});
+
+// Periodic sync check (every 5 seconds)
+setInterval(function() {
+    const currentItems = localStorage.getItem('pindiVantaluMenuItems');
+    if (currentItems !== JSON.stringify(menuItems)) {
+        loadMenuItems();
+        renderMenuItems();
+        console.log('Menu items auto-synced');
+    }
+}, 5000);
